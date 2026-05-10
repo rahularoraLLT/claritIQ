@@ -358,7 +358,9 @@ export default function StudyPage() {
   // Output state
   const [explanation, setExplanation] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-
+  const [simulation, setSimulation] = useState(null)
+  const [simLoading, setSimLoading] = useState(false)
+  const [showSim, setShowSim] = useState(false)
   const abortRef = useRef(null)
   const explanationEndRef = useRef(null)
 
@@ -447,6 +449,27 @@ export default function StudyPage() {
   const currentIndex = topicList.indexOf(selectedTopic)
   if (currentIndex === -1 || currentIndex === topicList.length - 1) return null
   return topicList[currentIndex + 1]
+}
+  async function handleSimulation() {
+  setSimLoading(true)
+  setShowSim(true)
+  try {
+    const res = await fetch('/api/simulation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        board: selectedBoard, classYear: selectedClass,
+        subject: selectedSubject, chapter: selectedChapter,
+        topic: effectiveTopic
+      })
+    })
+    const data = await res.json()
+    setSimulation(data)
+  } catch (err) {
+    console.error('Simulation error:', err)
+  } finally {
+    setSimLoading(false)
+  }
 }
   async function handleExplain() {
     if (!effectiveTopic) return
@@ -684,12 +707,14 @@ export default function StudyPage() {
                 >
                   📍 New Topic
                 </button>
+                
                 <button
-                  onClick={handleExplain}
-                  style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #3b82f6', background: 'transparent', color: '#60a5fa', cursor: 'pointer' }}
+                  onClick={handleSimulation}
+                  style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #fbbf24', background: 'transparent', color: '#fbbf24', cursor: 'pointer' }}
                 >
-                  🔄 Explain Again
+                  🎮 Visualise
                 </button>
+
                 <button
                   onClick={() => router.push('/doubt')}
                   style={{ padding: '8px 18px', borderRadius: 8, border: '1px solid #a78bfa', background: 'transparent', color: '#a78bfa', cursor: 'pointer' }}
@@ -720,6 +745,44 @@ export default function StudyPage() {
           </div>
         )}
 
+
+{/* Simulation Panel */}
+        {showSim && (
+          <div style={{ background: '#0f1729', border: '1px solid #1e293b', borderRadius: 16, padding: 24, marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ color: '#fbbf24', fontWeight: 700 }}>🎮 Visual & Simulation: {effectiveTopic}</h3>
+              <button onClick={() => { setShowSim(false); setSimulation(null) }} style={{ background: 'none', border: 'none', color: '#475569', cursor: 'pointer', fontSize: '1.2rem' }}>✕</button>
+            </div>
+            {simLoading && (
+              <div style={{ textAlign: 'center', padding: '40px', color: '#fbbf24' }}>
+                <div style={{ fontSize: '2rem', marginBottom: 12, animation: 'spin 2s linear infinite', display: 'inline-block' }}>⚙️</div>
+                <p>Generating simulation and diagram...</p>
+                <p style={{ color: '#475569', fontSize: '0.85rem', marginTop: 4 }}>This takes ~10 seconds the first time, then it's cached</p>
+              </div>
+            )}
+            {simulation?.svg_diagram && !simLoading && (
+              <div style={{ marginBottom: 24 }}>
+                <h4 style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>📊 Diagram</h4>
+                <div style={{ background: '#0a0f1e', borderRadius: 12, padding: 16, overflowX: 'auto' }}
+                  dangerouslySetInnerHTML={{ __html: simulation.svg_diagram }}
+                />
+              </div>
+            )}
+            {simulation?.simulation_html && !simLoading && (
+              <div>
+                <h4 style={{ color: '#94a3b8', fontSize: '0.85rem', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.05em' }}>🎮 Interactive Simulation</h4>
+                <iframe
+                  srcDoc={simulation.simulation_html}
+                  style={{ width: '100%', height: 450, border: 'none', borderRadius: 12, background: '#0a0f1e' }}
+                  sandbox="allow-scripts"
+                  title={`Simulation: ${effectiveTopic}`}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+
         {/* Empty state */}
         {!explanation && !isStreaming && (
           <div style={{ textAlign: 'center', padding: '60px 0', color: '#334155' }}>
@@ -732,6 +795,7 @@ export default function StudyPage() {
 
       <style>{`
         @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+        @keyframes spin { to { transform: rotate(360deg) } }
         select option { background: #1e293b; color: #e2e8f0; }
       `}</style>
     </div>
